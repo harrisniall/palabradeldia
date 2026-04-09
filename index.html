@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Palabra del Día</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>📖 Palabra del Día</h1>
+      <div class="date-row">
+        <button id="prev-day" class="date-nav" aria-label="Previous day">‹</button>
+        <button id="date-btn" class="date-btn" aria-label="Pick a date">
+          <span id="today-date"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+        <input type="date" id="date-picker" min="2026-01-01" tabindex="-1" aria-hidden="true">
+        <button id="next-day" class="date-nav" aria-label="Next day">›</button>
+      </div>
+      <button id="today-link" class="today-link hidden">↩ Volver a hoy</button>
+    </header>
+
+    <main id="game-area">
+      <div id="progress-bar">
+        <div class="step" data-level="easy">
+          <span class="dot"></span>
+          <span class="label">Fácil</span>
+        </div>
+        <div class="connector"></div>
+        <div class="step" data-level="medium">
+          <span class="dot"></span>
+          <span class="label">Medio</span>
+        </div>
+        <div class="connector"></div>
+        <div class="step" data-level="hard">
+          <span class="dot"></span>
+          <span class="label">Difícil</span>
+        </div>
+      </div>
+
+      <div id="word-card">
+        <div class="level-badge" id="level-badge"></div>
+        <div class="emoji-display" id="emoji-display"></div>
+        <div class="prompt">
+          <p class="instruction">¿Cómo se dice en español?</p>
+          <div class="english-word" id="english-word" tabindex="0" role="button" aria-label="Click for hint">
+            <span id="english-text"></span>
+            <span class="pos-tag" id="pos-tag"></span>
+            <div class="hint-tooltip" id="hint-tooltip"></div>
+          </div>
+          <p class="hint-note" id="hint-note">💡 Click the word above for a hint</p>
+        </div>
+
+        <form id="guess-form">
+          <div class="input-wrapper">
+            <input type="text" id="guess-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escribe la palabra..." autofocus>
+            <button type="submit" id="submit-btn">→</button>
+          </div>
+        </form>
+
+        <div id="feedback" class="feedback hidden"></div>
+
+        <div id="actions" class="actions hidden">
+          <button id="reveal-btn" class="btn-reveal">Mostrar respuesta</button>
+        </div>
+
+        <div id="result" class="result hidden">
+          <div class="result-word" id="result-word"></div>
+          <div class="result-context" id="result-context"></div>
+          <button id="next-btn" class="btn-next">Siguiente →</button>
+        </div>
+      </div>
+
+      <div id="summary" class="hidden">
+        <div class="summary-card">
+          <h2>🎉 ¡Completado!</h2>
+          <p class="summary-subtitle">Tus palabras de hoy:</p>
+          <div id="summary-words"></div>
+          <div class="streak-display">
+            <span class="streak-icon">🔥</span>
+            <span id="streak-count">0</span> día(s) seguidos
+          </div>
+          <p class="comeback">Vuelve mañana para más palabras nuevas</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Aprende español, una palabra a la vez 🇪🇸</p>
+    </footer>
+  </div>
+
+  <script src="words-easy.js"></script>
+  <script src="words-medium.js"></script>
+  <script src="words-hard.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
