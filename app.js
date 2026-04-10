@@ -84,6 +84,35 @@
     return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   }
 
+  // --- Gender article helpers ---
+  const GENDER_NAMES = { m: 'masculino', f: 'femenino' };
+
+  // Feminine nouns with stressed initial a/á use "el" (el agua, el águila)
+  const STRESSED_A_FEMININE = new Set([
+    'agua', 'águila', 'alma', 'arma', 'área', 'aula', 'ama', 'ala',
+    'alga', 'alba', 'alta', 'arca', 'arpa', 'asa', 'asma', 'hada',
+    'hambre', 'hacha', 'habla', 'haba',
+  ]);
+
+  function articleFor(w) {
+    if (w.pos !== 'n' || !w.gen) return '';
+    if (w.gen === 'f' && STRESSED_A_FEMININE.has(w.es.toLowerCase())) return 'el';
+    return w.gen === 'm' ? 'el' : 'la';
+  }
+
+  function displayEs(w) {
+    const art = articleFor(w);
+    return art ? art + ' ' + w.es : w.es;
+  }
+
+  // Parse a guess that may include an article: returns { article, bareWord }
+  function parseGuessArticle(guess) {
+    const g = guess.trim().toLowerCase();
+    if (g.startsWith('el ')) return { article: 'el', bareWord: g.slice(3).trim() };
+    if (g.startsWith('la ')) return { article: 'la', bareWord: g.slice(3).trim() };
+    return { article: null, bareWord: g.trim() };
+  }
+
   // --- Generate hint string ---
   function generateHint(word) {
     if (word.length <= 3) return word[0] + '_'.repeat(word.length - 1);
@@ -270,8 +299,12 @@
     levelBadge.className = 'level-badge ' + word.level;
     emojiDisplay.textContent = word.emoji;
     englishText.textContent = word.en;
-    posTag.textContent = POS_NAMES[word.pos] || word.pos;
-    hintTooltip.textContent = generateHint(word.es);
+    const posLabel = POS_NAMES[word.pos] || word.pos;
+    const genLabel = word.gen ? ` (${GENDER_NAMES[word.gen]})` : '';
+    posTag.textContent = posLabel + genLabel;
+    // For nouns, show article + hint; for other POS, just the hint
+    const art = articleFor(word);
+    hintTooltip.textContent = art ? art + ' ' + generateHint(word.es) : generateHint(word.es);
 
     englishWord.classList.remove('show-hint');
     hintNote.classList.remove('used');
@@ -293,23 +326,31 @@
   // --- Check guess ---
   function checkGuess(guess) {
     const word = currentWords[currentIndex];
-    const normalizedGuess = normalize(guess);
+    const expectedArticle = articleFor(word);
+    const { article: guessedArticle, bareWord } = parseGuessArticle(guess);
+    const normalizedBare = normalize(bareWord);
     const normalizedAnswer = normalize(word.es);
 
-    if (normalizedGuess === normalizedAnswer) {
-      const isAccentPerfect = guess.toLowerCase().trim() === word.es.toLowerCase();
-      showCorrect(word, true, isAccentPerfect);
+    if (normalizedBare === normalizedAnswer) {
+      const isAccentPerfect = bareWord.toLowerCase().trim() === word.es.toLowerCase();
+      // Check article correctness for nouns
+      let articleStatus = 'none'; // 'correct', 'wrong', 'none'
+      if (expectedArticle) {
+        if (guessedArticle === expectedArticle) articleStatus = 'correct';
+        else if (guessedArticle && guessedArticle !== expectedArticle) articleStatus = 'wrong';
+      }
+      showCorrect(word, true, isAccentPerfect, articleStatus);
       return;
     }
 
-    const dist = levenshtein(normalizedGuess, normalizedAnswer);
+    const dist = levenshtein(normalizedBare, normalizedAnswer);
     attempts++;
 
     if (dist === 1) {
       showFeedback('close', '🤏 ¡Casi! Solo una letra de diferencia. Inténtalo de nuevo.');
     } else if (dist === 2) {
       showFeedback('close', '🔤 ¡Cerca! Revisa la ortografía — estás a dos letras.');
-    } else if (normalizedAnswer.includes(normalizedGuess) || normalizedGuess.includes(normalizedAnswer)) {
+    } else if (normalizedAnswer.includes(normalizedBare) || normalizedBare.includes(normalizedAnswer)) {
       showFeedback('close', '📏 Vas por buen camino, pero la longitud no es correcta.');
     } else {
       showFeedback('wrong', '❌ No es correcto. ¡Sigue intentando!');
@@ -326,20 +367,26 @@
     feedback.textContent = message;
   }
 
-  function showCorrect(word, guessed, accentPerfect) {
+  function showCorrect(word, guessed, accentPerfect, articleStatus) {
     guessInput.disabled = true;
     guessForm.classList.add('hidden');
     feedback.className = 'feedback hidden';
     actions.classList.add('hidden');
 
     result.classList.remove('hidden');
-    resultWord.textContent = word.es;
+    resultWord.textContent = displayEs(word);
     resultWord.className = 'result-word';
 
     let context = '';
     if (guessed) {
-      if (!accentPerfect && word.es.toLowerCase().trim() !== normalize(word.es)) {
-        context += `✅ ¡Correcto! Nota: la ortografía exacta es "${word.es}" (con tildes).\n`;
+      const hasAccentIssue = !accentPerfect && word.es.toLowerCase().trim() !== normalize(word.es);
+      if (articleStatus === 'wrong') {
+        const correctArt = articleFor(word);
+        context += `✅ ¡Palabra correcta! Pero el género es incorrecto — es "${correctArt} ${word.es}" (${GENDER_NAMES[word.gen]}).\n`;
+      } else if (articleStatus === 'none' && articleFor(word)) {
+        context += `✅ ¡Correcto! No olvides el artículo: "${displayEs(word)}" (${GENDER_NAMES[word.gen]}).\n`;
+      } else if (hasAccentIssue) {
+        context += `✅ ¡Correcto! Nota: la ortografía exacta es "${displayEs(word)}" (con tildes).\n`;
       } else {
         context += '✅ ¡Perfecto!\n';
       }
@@ -348,7 +395,9 @@
       resultWord.classList.add('revealed');
     }
 
-    context += `${word.emoji} ${word.en} → ${word.es} (${POS_NAMES[word.pos] || word.pos})`;
+    const posLabel = POS_NAMES[word.pos] || word.pos;
+    const genLabel = word.gen ? ` · ${GENDER_NAMES[word.gen]}` : '';
+    context += `${word.emoji} ${word.en} → ${displayEs(word)} (${posLabel}${genLabel})`;
 
     if (word.ctx) {
       context += `\n💬 "${word.ctx}"`;
@@ -370,7 +419,7 @@
   // --- Reveal answer ---
   function revealAnswer() {
     const word = currentWords[currentIndex];
-    showCorrect(word, false, false);
+    showCorrect(word, false, false, 'none');
   }
 
   // --- Next word ---
@@ -396,8 +445,8 @@
       div.innerHTML = `
         <span class="s-emoji">${r.word.emoji}</span>
         <div class="s-words">
-          <div class="s-spanish">${r.word.es}</div>
-          <div class="s-english">${r.word.en} · ${POS_NAMES[r.word.pos] || r.word.pos}</div>
+          <div class="s-spanish">${displayEs(r.word)}</div>
+          <div class="s-english">${r.word.en} · ${POS_NAMES[r.word.pos] || r.word.pos}${r.word.gen ? ' · ' + GENDER_NAMES[r.word.gen] : ''}</div>
         </div>
         <span class="s-result">${r.guessed ? '✅' : '📝'}</span>
       `;
@@ -669,8 +718,11 @@
     pLevelBadge.className = 'level-badge ' + word.level;
     pEmojiDisplay.textContent = word.emoji;
     pEnglishText.textContent = word.en;
-    pPosTag.textContent = POS_NAMES[word.pos] || word.pos;
-    pHintTooltip.textContent = generateHint(word.es);
+    const pPosLabel = POS_NAMES[word.pos] || word.pos;
+    const pGenLabel = word.gen ? ` (${GENDER_NAMES[word.gen]})` : '';
+    pPosTag.textContent = pPosLabel + pGenLabel;
+    const pArt = articleFor(word);
+    pHintTooltip.textContent = pArt ? pArt + ' ' + generateHint(word.es) : generateHint(word.es);
 
     pEnglishWord.classList.remove('show-hint');
     pHintNote.classList.remove('used');
@@ -693,12 +745,19 @@
   // --- Check practice guess ---
   function checkPracticeGuess(guess) {
     const word = practiceQueue[practiceIndex];
-    const ng = normalize(guess);
+    const expectedArticle = articleFor(word);
+    const { article: guessedArticle, bareWord } = parseGuessArticle(guess);
+    const ng = normalize(bareWord);
     const na = normalize(word.es);
 
     if (ng === na) {
-      const perfect = guess.toLowerCase().trim() === word.es.toLowerCase();
-      showPracticeCorrect(word, true, perfect);
+      const perfect = bareWord.toLowerCase().trim() === word.es.toLowerCase();
+      let articleStatus = 'none';
+      if (expectedArticle) {
+        if (guessedArticle === expectedArticle) articleStatus = 'correct';
+        else if (guessedArticle && guessedArticle !== expectedArticle) articleStatus = 'wrong';
+      }
+      showPracticeCorrect(word, true, perfect, articleStatus);
       return;
     }
 
@@ -725,20 +784,26 @@
   }
 
   // --- Show practice correct/revealed ---
-  function showPracticeCorrect(word, guessed, accentPerfect) {
+  function showPracticeCorrect(word, guessed, accentPerfect, articleStatus) {
     pGuessInput.disabled = true;
     pGuessForm.classList.add('hidden');
     pFeedback.className = 'feedback hidden';
     pActions.classList.add('hidden');
     pResult.classList.remove('hidden');
 
-    pResultWord.textContent = word.es;
+    pResultWord.textContent = displayEs(word);
     pResultWord.className = 'result-word';
 
     let ctx = '';
     if (guessed) {
-      if (!accentPerfect && word.es.toLowerCase().trim() !== normalize(word.es)) {
-        ctx += `✅ ¡Correcto! Nota: "${word.es}" (con tildes).\n`;
+      const hasAccentIssue = !accentPerfect && word.es.toLowerCase().trim() !== normalize(word.es);
+      if (articleStatus === 'wrong') {
+        const correctArt = articleFor(word);
+        ctx += `✅ ¡Palabra correcta! Pero el género es incorrecto — es "${correctArt} ${word.es}" (${GENDER_NAMES[word.gen]}).\n`;
+      } else if (articleStatus === 'none' && articleFor(word)) {
+        ctx += `✅ ¡Correcto! No olvides el artículo: "${displayEs(word)}" (${GENDER_NAMES[word.gen]}).\n`;
+      } else if (hasAccentIssue) {
+        ctx += `✅ ¡Correcto! Nota: "${displayEs(word)}" (con tildes).\n`;
       } else {
         ctx += '✅ ¡Perfecto!\n';
       }
@@ -747,7 +812,9 @@
       pResultWord.classList.add('revealed');
     }
 
-    ctx += `${word.emoji} ${word.en} → ${word.es} (${POS_NAMES[word.pos] || word.pos})`;
+    const posLabel = POS_NAMES[word.pos] || word.pos;
+    const genLabel = word.gen ? ` · ${GENDER_NAMES[word.gen]}` : '';
+    ctx += `${word.emoji} ${word.en} → ${displayEs(word)} (${posLabel}${genLabel})`;
     if (word.ctx) ctx += `\n💬 "${word.ctx}"`;
 
     pResultContext.textContent = ctx;
@@ -760,7 +827,7 @@
 
   // --- Reveal practice answer ---
   function revealPracticeAnswer() {
-    showPracticeCorrect(practiceQueue[practiceIndex], false, false);
+    showPracticeCorrect(practiceQueue[practiceIndex], false, false, 'none');
   }
 
   // --- Next practice word ---
@@ -802,8 +869,8 @@
       div.innerHTML = `
         <span class="s-emoji">${s.word.emoji}</span>
         <div class="s-words">
-          <div class="s-spanish">${s.word.es}</div>
-          <div class="s-english">${s.word.en} · ${POS_NAMES[s.word.pos] || s.word.pos}</div>
+          <div class="s-spanish">${displayEs(s.word)}</div>
+          <div class="s-english">${s.word.en} · ${POS_NAMES[s.word.pos] || s.word.pos}${s.word.gen ? ' · ' + GENDER_NAMES[s.word.gen] : ''}</div>
         </div>
         <span class="s-result">${s.correct}/${s.total} ${icon}</span>
       `;
