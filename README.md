@@ -2,7 +2,7 @@
 
 A simple, daily Spanish vocabulary game. Learn one easy, one medium, and one rare Spanish word each day.
 
-**[Try it live →](#)** *(update with your deployment URL)*
+**[Try it live →](https://palabradeldia.onrender.com)** *(update with your deployment URL)*
 
 ## Features
 
