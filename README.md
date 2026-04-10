@@ -7,6 +7,8 @@ A simple, daily Spanish vocabulary game. Learn one easy, one medium, and one rar
 ## Features
 
 - **3 words daily** — one beginner, one intermediate, one advanced, chosen deterministically by date
+- **Practice mode** — 15-question sessions with spaced repetition: 7 unique words repeated for reinforcement, favouring words you've already seen
+- **Difficulty toggles** — practice with any combination of easy, medium, and hard words
 - **2,670 curated words** — 869 easy, 913 medium, 888 hard — each with emoji, part of speech, and example sentence
 - **Hint system** — click the English word to reveal a letter pattern (e.g., `ma _ _ _ _ sa`)
 - **Fuzzy matching** — detects close guesses (1–2 letters off) and encourages you to try again
@@ -17,7 +19,15 @@ A simple, daily Spanish vocabulary game. Learn one easy, one medium, and one rar
 
 ## Screenshot
 
-*(Add a screenshot here)*
+<p align="center">
+  <img src="screenshots/daily.png" alt="Daily mode" width="280">
+  &nbsp;&nbsp;
+  <img src="screenshots/practice-setup.png" alt="Practice setup" width="280">
+  &nbsp;&nbsp;
+  <img src="screenshots/practice-game.png" alt="Practice game" width="280">
+</p>
+
+<p align="center"><em>Daily mode · Practice setup · Practice in progress</em></p>
 
 ## How It Works
 
@@ -68,6 +78,7 @@ Deploy to any static hosting:
 ├── words-easy.js       # 869 beginner words
 ├── words-medium.js     # 913 intermediate words
 ├── words-hard.js       # 888 advanced/rare words
+├── screenshots/        # README images
 ├── .gitignore
 └── README.md
 ```
