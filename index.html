@@ -23,6 +23,11 @@
       <button id="today-link" class="today-link hidden">↩ Volver a hoy</button>
     </header>
 
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="daily">📖 Diaria</button>
+      <button class="tab" data-tab="practice">🏋️ Práctica</button>
+    </nav>
+
     <main id="game-area">
       <div id="progress-bar">
         <div class="step" data-level="easy">
@@ -87,6 +92,81 @@
         </div>
       </div>
     </main>
+
+    <section id="practice-area" class="hidden">
+      <div id="practice-setup">
+        <div class="practice-setup-card">
+          <h2>🏋️ Modo Práctica</h2>
+          <p class="practice-desc">15 preguntas con repetición para reforzar tu aprendizaje. Las palabras que ya has visto aparecerán más, junto con algunas nuevas.</p>
+          <div class="difficulty-toggles">
+            <label class="toggle-chip">
+              <input type="checkbox" id="toggle-easy" checked>
+              <span class="chip easy">Fácil</span>
+            </label>
+            <label class="toggle-chip">
+              <input type="checkbox" id="toggle-medium" checked>
+              <span class="chip medium">Medio</span>
+            </label>
+            <label class="toggle-chip">
+              <input type="checkbox" id="toggle-hard" checked>
+              <span class="chip hard">Difícil</span>
+            </label>
+          </div>
+          <p id="toggle-error" class="toggle-error hidden">Selecciona al menos un nivel</p>
+          <div id="practice-history" class="practice-history hidden">
+            <span>📊</span> Última práctica hoy: <strong id="practice-last-score"></strong>
+          </div>
+          <button id="start-practice-btn" class="btn-start-practice">Comenzar →</button>
+        </div>
+      </div>
+      <div id="practice-game" class="hidden">
+        <div class="practice-progress-wrapper">
+          <div class="practice-progress-track">
+            <div class="practice-progress-fill" id="practice-progress-fill"></div>
+          </div>
+          <span class="practice-progress-text" id="practice-progress-text">1 / 15</span>
+        </div>
+        <div id="practice-word-card">
+          <div class="level-badge" id="p-level-badge"></div>
+          <div class="emoji-display" id="p-emoji-display"></div>
+          <div class="prompt">
+            <p class="instruction">¿Cómo se dice en español?</p>
+            <div class="english-word" id="p-english-word" tabindex="0" role="button" aria-label="Click for hint">
+              <span id="p-english-text"></span>
+              <span class="pos-tag" id="p-pos-tag"></span>
+              <div class="hint-tooltip" id="p-hint-tooltip"></div>
+            </div>
+            <p class="hint-note" id="p-hint-note">💡 Click the word above for a hint</p>
+          </div>
+          <form id="p-guess-form">
+            <div class="input-wrapper">
+              <input type="text" id="p-guess-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escribe la palabra...">
+              <button type="submit" id="p-submit-btn">→</button>
+            </div>
+          </form>
+          <div id="p-feedback" class="feedback hidden"></div>
+          <div id="p-actions" class="actions hidden">
+            <button id="p-reveal-btn" class="btn-reveal">Mostrar respuesta</button>
+          </div>
+          <div id="p-result" class="result hidden">
+            <div class="result-word" id="p-result-word"></div>
+            <div class="result-context" id="p-result-context"></div>
+            <button id="p-next-btn" class="btn-next">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+      <div id="practice-summary" class="hidden">
+        <div class="summary-card">
+          <h2>🏋️ ¡Práctica completada!</h2>
+          <p class="summary-subtitle" id="practice-score-text"></p>
+          <div id="practice-summary-words"></div>
+          <div class="practice-summary-actions">
+            <button id="practice-again-btn" class="btn-next">Practicar de nuevo</button>
+            <button id="practice-back-btn" class="btn-link">← Volver a Diaria</button>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <footer>
       <p>Aprende español, una palabra a la vez 🇪🇸</p>

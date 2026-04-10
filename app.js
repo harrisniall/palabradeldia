@@ -145,6 +145,14 @@
   let attempts = 0;
   let results = [];
   let hintUsed = false;
+  let activeTab = 'daily';
+
+  // --- Practice State ---
+  let practiceQueue = [];
+  let practiceIndex = 0;
+  let practiceAttempts = 0;
+  let practiceHintUsed = false;
+  let practiceResults = [];
 
   // --- DOM refs ---
   const $ = id => document.getElementById(id);
@@ -174,6 +182,40 @@
   const summary = $('summary');
   const summaryWords = $('summary-words');
   const streakCount = $('streak-count');
+
+  // --- Practice DOM refs ---
+  const practiceArea = $('practice-area');
+  const gameArea = $('game-area');
+  const pSetup = $('practice-setup');
+  const pGame = $('practice-game');
+  const pSummaryEl = $('practice-summary');
+  const pProgressFill = $('practice-progress-fill');
+  const pProgressText = $('practice-progress-text');
+  const pLevelBadge = $('p-level-badge');
+  const pEmojiDisplay = $('p-emoji-display');
+  const pEnglishText = $('p-english-text');
+  const pPosTag = $('p-pos-tag');
+  const pEnglishWord = $('p-english-word');
+  const pHintTooltip = $('p-hint-tooltip');
+  const pHintNote = $('p-hint-note');
+  const pGuessForm = $('p-guess-form');
+  const pGuessInput = $('p-guess-input');
+  const pFeedback = $('p-feedback');
+  const pActions = $('p-actions');
+  const pRevealBtn = $('p-reveal-btn');
+  const pResult = $('p-result');
+  const pResultWord = $('p-result-word');
+  const pResultContext = $('p-result-context');
+  const pNextBtn = $('p-next-btn');
+  const pWordCard = $('practice-word-card');
+  const pHistory = $('practice-history');
+  const pLastScore = $('practice-last-score');
+  const pScoreText = $('practice-score-text');
+  const pSummaryWords = $('practice-summary-words');
+  const toggleError = $('toggle-error');
+  const startPracticeBtn = $('start-practice-btn');
+  const practiceAgainBtn = $('practice-again-btn');
+  const practiceBackBtn = $('practice-back-btn');
 
   // --- Format date ---
   function formatDate(date) {
@@ -432,6 +474,355 @@
     showWord();
   }
 
+  // =============================================
+  // PRACTICE MODE
+  // =============================================
+
+  // --- Shuffle array in-place (non-seeded) ---
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // --- Get all previously seen words ---
+  function getSeenWords() {
+    const storage = getStorage();
+    const seen = new Set();
+    for (const key in storage) {
+      if (key === 'streak' || key === 'practice') continue;
+      if (storage[key] && storage[key].results) {
+        storage[key].results.forEach(r => seen.add(r.es));
+      }
+    }
+    if (storage.practice) {
+      for (const dk in storage.practice) {
+        storage.practice[dk].forEach(s => {
+          if (s.words) s.words.forEach(w => seen.add(w));
+        });
+      }
+    }
+    return seen;
+  }
+
+  // --- Build practice session: 7 unique words → 15-question queue ---
+  function buildPracticeSession(levels) {
+    const TOTAL = 15;
+    const UNIQUE_TARGET = 7;
+    const NEW_TARGET = 3;
+
+    const seenSet = getSeenWords();
+    const pools = { easy: WORDS_EASY, medium: WORDS_MEDIUM, hard: WORDS_HARD };
+
+    let seenCandidates = [];
+    let unseenCandidates = [];
+
+    for (const level of levels) {
+      for (const word of pools[level]) {
+        const entry = { ...word, level };
+        if (seenSet.has(word.es)) {
+          seenCandidates.push(entry);
+        } else {
+          unseenCandidates.push(entry);
+        }
+      }
+    }
+
+    shuffleArray(seenCandidates);
+    shuffleArray(unseenCandidates);
+
+    // Pick unique words: prefer seen, add some unseen
+    const newCount = Math.min(NEW_TARGET, unseenCandidates.length);
+    const seenCount = Math.min(UNIQUE_TARGET - newCount, seenCandidates.length);
+
+    let unique = [];
+    unique.push(...seenCandidates.slice(0, seenCount));
+    unique.push(...unseenCandidates.slice(0, newCount));
+
+    // Fill remaining if needed
+    if (unique.length < UNIQUE_TARGET) {
+      const extra = [
+        ...seenCandidates.slice(seenCount),
+        ...unseenCandidates.slice(newCount)
+      ];
+      shuffleArray(extra);
+      unique.push(...extra.slice(0, UNIQUE_TARGET - unique.length));
+    }
+
+    if (unique.length === 0) return [];
+
+    // Build queue: each word at least 2x, extras to reach 15
+    let queue = [];
+    unique.forEach(w => { queue.push(w); queue.push(w); });
+    let remaining = TOTAL - queue.length;
+    for (let i = 0; remaining > 0; i++, remaining--) {
+      queue.push(unique[i % unique.length]);
+    }
+
+    // Shuffle avoiding adjacent duplicates
+    for (let a = 0; a < 100; a++) {
+      shuffleArray(queue);
+      let ok = true;
+      for (let i = 1; i < queue.length; i++) {
+        if (queue[i].es === queue[i - 1].es) { ok = false; break; }
+      }
+      if (ok) return queue;
+    }
+
+    // Fallback: fix remaining adjacent duplicates
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].es === queue[i - 1].es) {
+        for (let j = i + 1; j < queue.length; j++) {
+          if (queue[j].es !== queue[i - 1].es) {
+            [queue[i], queue[j]] = [queue[j], queue[i]];
+            break;
+          }
+        }
+      }
+    }
+
+    return queue;
+  }
+
+  // --- Tab switching ---
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
+    });
+
+    const dateRow = document.querySelector('.date-row');
+
+    if (tab === 'daily') {
+      gameArea.classList.remove('hidden');
+      practiceArea.classList.add('hidden');
+      dateRow.classList.remove('hidden');
+      todayLink.classList.toggle('hidden', isToday(selectedDate));
+    } else {
+      gameArea.classList.add('hidden');
+      practiceArea.classList.remove('hidden');
+      dateRow.classList.add('hidden');
+      todayLink.classList.add('hidden');
+      showPracticeSetup();
+    }
+  }
+
+  // --- Show practice setup screen ---
+  function showPracticeSetup() {
+    pSetup.classList.remove('hidden');
+    pGame.classList.add('hidden');
+    pSummaryEl.classList.add('hidden');
+    toggleError.classList.add('hidden');
+
+    // Show today's practice history if exists
+    const storage = getStorage();
+    const key = dateKey(new Date());
+    if (storage.practice && storage.practice[key] && storage.practice[key].length > 0) {
+      const last = storage.practice[key][storage.practice[key].length - 1];
+      pLastScore.textContent = `${last.score}/${last.total} correctas`;
+      pHistory.classList.remove('hidden');
+    } else {
+      pHistory.classList.add('hidden');
+    }
+  }
+
+  // --- Start practice ---
+  function startPractice() {
+    const levels = [];
+    if ($('toggle-easy').checked) levels.push('easy');
+    if ($('toggle-medium').checked) levels.push('medium');
+    if ($('toggle-hard').checked) levels.push('hard');
+
+    if (levels.length === 0) {
+      toggleError.classList.remove('hidden');
+      return;
+    }
+    toggleError.classList.add('hidden');
+
+    practiceQueue = buildPracticeSession(levels);
+    practiceIndex = 0;
+    practiceResults = [];
+
+    pSetup.classList.add('hidden');
+    pGame.classList.remove('hidden');
+    pSummaryEl.classList.add('hidden');
+
+    showPracticeWord();
+  }
+
+  // --- Update practice progress bar ---
+  function updatePracticeProgress() {
+    const pct = (practiceIndex / practiceQueue.length) * 100;
+    pProgressFill.style.width = pct + '%';
+    pProgressText.textContent = `${practiceIndex + 1} / ${practiceQueue.length}`;
+  }
+
+  // --- Show current practice word ---
+  function showPracticeWord() {
+    const word = practiceQueue[practiceIndex];
+    practiceAttempts = 0;
+    practiceHintUsed = false;
+
+    pLevelBadge.textContent = LEVEL_NAMES[word.level];
+    pLevelBadge.className = 'level-badge ' + word.level;
+    pEmojiDisplay.textContent = word.emoji;
+    pEnglishText.textContent = word.en;
+    pPosTag.textContent = POS_NAMES[word.pos] || word.pos;
+    pHintTooltip.textContent = generateHint(word.es);
+
+    pEnglishWord.classList.remove('show-hint');
+    pHintNote.classList.remove('used');
+    pHintNote.textContent = '💡 Click the word above for a hint';
+
+    pGuessInput.value = '';
+    pGuessInput.disabled = false;
+    pFeedback.className = 'feedback hidden';
+    pFeedback.textContent = '';
+    pActions.classList.add('hidden');
+    pResult.classList.add('hidden');
+    pGuessForm.classList.remove('hidden');
+    pWordCard.classList.remove('hidden');
+
+    updatePracticeProgress();
+
+    setTimeout(() => pGuessInput.focus(), 100);
+  }
+
+  // --- Check practice guess ---
+  function checkPracticeGuess(guess) {
+    const word = practiceQueue[practiceIndex];
+    const ng = normalize(guess);
+    const na = normalize(word.es);
+
+    if (ng === na) {
+      const perfect = guess.toLowerCase().trim() === word.es.toLowerCase();
+      showPracticeCorrect(word, true, perfect);
+      return;
+    }
+
+    const dist = levenshtein(ng, na);
+    practiceAttempts++;
+
+    if (dist === 1) {
+      pFeedback.className = 'feedback close';
+      pFeedback.textContent = '🤏 ¡Casi! Solo una letra de diferencia.';
+    } else if (dist === 2) {
+      pFeedback.className = 'feedback close';
+      pFeedback.textContent = '🔤 ¡Cerca! Revisa la ortografía.';
+    } else if (na.includes(ng) || ng.includes(na)) {
+      pFeedback.className = 'feedback close';
+      pFeedback.textContent = '📏 Vas por buen camino, longitud incorrecta.';
+    } else {
+      pFeedback.className = 'feedback wrong';
+      pFeedback.textContent = '❌ No es correcto. ¡Sigue intentando!';
+    }
+
+    pActions.classList.remove('hidden');
+    pGuessInput.classList.add('shake');
+    setTimeout(() => pGuessInput.classList.remove('shake'), 300);
+  }
+
+  // --- Show practice correct/revealed ---
+  function showPracticeCorrect(word, guessed, accentPerfect) {
+    pGuessInput.disabled = true;
+    pGuessForm.classList.add('hidden');
+    pFeedback.className = 'feedback hidden';
+    pActions.classList.add('hidden');
+    pResult.classList.remove('hidden');
+
+    pResultWord.textContent = word.es;
+    pResultWord.className = 'result-word';
+
+    let ctx = '';
+    if (guessed) {
+      if (!accentPerfect && word.es.toLowerCase().trim() !== normalize(word.es)) {
+        ctx += `✅ ¡Correcto! Nota: "${word.es}" (con tildes).\n`;
+      } else {
+        ctx += '✅ ¡Perfecto!\n';
+      }
+    } else {
+      ctx += '📝 Para recordar:\n';
+      pResultWord.classList.add('revealed');
+    }
+
+    ctx += `${word.emoji} ${word.en} → ${word.es} (${POS_NAMES[word.pos] || word.pos})`;
+    if (word.ctx) ctx += `\n💬 "${word.ctx}"`;
+
+    pResultContext.textContent = ctx;
+
+    practiceResults.push({ word, guessed, attempts: practiceAttempts });
+
+    pEmojiDisplay.classList.add('pop');
+    setTimeout(() => pEmojiDisplay.classList.remove('pop'), 300);
+  }
+
+  // --- Reveal practice answer ---
+  function revealPracticeAnswer() {
+    showPracticeCorrect(practiceQueue[practiceIndex], false, false);
+  }
+
+  // --- Next practice word ---
+  function nextPracticeWord() {
+    practiceIndex++;
+    if (practiceIndex >= practiceQueue.length) {
+      showPracticeSummary();
+    } else {
+      showPracticeWord();
+    }
+  }
+
+  // --- Show practice summary ---
+  function showPracticeSummary() {
+    pGame.classList.add('hidden');
+    pSummaryEl.classList.remove('hidden');
+
+    // Aggregate results by unique word
+    const stats = {};
+    const order = [];
+    practiceResults.forEach(r => {
+      if (!stats[r.word.es]) {
+        stats[r.word.es] = { word: r.word, correct: 0, total: 0 };
+        order.push(r.word.es);
+      }
+      stats[r.word.es].total++;
+      if (r.guessed) stats[r.word.es].correct++;
+    });
+
+    const totalCorrect = practiceResults.filter(r => r.guessed).length;
+    pScoreText.textContent = `${totalCorrect} de ${practiceResults.length} correctas`;
+
+    pSummaryWords.innerHTML = '';
+    order.forEach(es => {
+      const s = stats[es];
+      const div = document.createElement('div');
+      div.className = 'summary-item';
+      const icon = s.correct === s.total ? '✅' : s.correct > 0 ? '⚠️' : '❌';
+      div.innerHTML = `
+        <span class="s-emoji">${s.word.emoji}</span>
+        <div class="s-words">
+          <div class="s-spanish">${s.word.es}</div>
+          <div class="s-english">${s.word.en} · ${POS_NAMES[s.word.pos] || s.word.pos}</div>
+        </div>
+        <span class="s-result">${s.correct}/${s.total} ${icon}</span>
+      `;
+      pSummaryWords.appendChild(div);
+    });
+
+    // Save practice result
+    const storage = getStorage();
+    if (!storage.practice) storage.practice = {};
+    const key = dateKey(new Date());
+    if (!storage.practice[key]) storage.practice[key] = [];
+    storage.practice[key].push({
+      score: totalCorrect,
+      total: practiceResults.length,
+      words: [...new Set(practiceResults.map(r => r.word.es))]
+    });
+    setStorage(storage);
+  }
+
   // --- Init ---
   function init() {
     // Set up date picker constraints
@@ -499,7 +890,55 @@
       if (e.key === 'Enter' && !result.classList.contains('hidden')) {
         nextWord();
       }
+      if (e.key === 'Enter' && !pResult.classList.contains('hidden')) {
+        nextPracticeWord();
+      }
     });
+
+    // --- Practice event listeners ---
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // Start practice
+    startPracticeBtn.addEventListener('click', startPractice);
+
+    // Toggle validation: hide error when a checkbox is checked
+    ['toggle-easy', 'toggle-medium', 'toggle-hard'].forEach(id => {
+      $(id).addEventListener('change', () => toggleError.classList.add('hidden'));
+    });
+
+    // Practice hint toggle
+    pEnglishWord.addEventListener('click', () => {
+      pEnglishWord.classList.toggle('show-hint');
+      if (!practiceHintUsed) {
+        practiceHintUsed = true;
+        pHintNote.textContent = '💡 Hint shown';
+        pHintNote.classList.add('used');
+      }
+    });
+
+    // Practice guess submit
+    pGuessForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const guess = pGuessInput.value.trim();
+      if (!guess) return;
+      checkPracticeGuess(guess);
+    });
+
+    // Practice reveal
+    pRevealBtn.addEventListener('click', revealPracticeAnswer);
+
+    // Practice next
+    pNextBtn.addEventListener('click', nextPracticeWord);
+
+    // Practice again
+    practiceAgainBtn.addEventListener('click', showPracticeSetup);
+
+    // Practice back to daily
+    practiceBackBtn.addEventListener('click', () => switchTab('daily'));
   }
 
   // Start
