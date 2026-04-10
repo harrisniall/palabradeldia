@@ -265,7 +265,7 @@ header h1 {
   user-select: none;
 }
 
-#english-text {
+#english-text, #p-english-text {
   font-size: 1.8rem;
   font-weight: 700;
   border-bottom: 2px dashed var(--muted);
@@ -273,7 +273,8 @@ header h1 {
   transition: color 0.2s;
 }
 
-.english-word:hover #english-text {
+.english-word:hover #english-text,
+.english-word:hover #p-english-text {
   color: var(--accent);
 }
 
@@ -333,7 +334,7 @@ header h1 {
 }
 
 /* Input */
-#guess-form {
+#guess-form, #p-guess-form {
   margin-top: 24px;
 }
 
@@ -344,7 +345,7 @@ header h1 {
   margin: 0 auto;
 }
 
-#guess-input {
+#guess-input, #p-guess-input {
   flex: 1;
   padding: 12px 16px;
   border: 2px solid var(--border);
@@ -355,11 +356,11 @@ header h1 {
   background: var(--bg);
 }
 
-#guess-input:focus {
+#guess-input:focus, #p-guess-input:focus {
   border-color: var(--accent);
 }
 
-#submit-btn {
+#submit-btn, #p-submit-btn {
   padding: 12px 20px;
   background: var(--accent);
   color: #fff;
@@ -370,7 +371,7 @@ header h1 {
   transition: background 0.2s;
 }
 
-#submit-btn:hover {
+#submit-btn:hover, #p-submit-btn:hover {
   background: #3d5bd9;
 }
 
@@ -777,7 +778,7 @@ footer {
     font-size: 1.3rem;
   }
 
-  #english-text {
+  #english-text, #p-english-text {
     font-size: 1.5rem;
   }
 
@@ -785,7 +786,7 @@ footer {
     font-size: 2.5rem;
   }
 
-  #word-card {
+  #word-card, #practice-word-card {
     padding: 24px 16px;
   }
 }
